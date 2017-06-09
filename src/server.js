@@ -27,7 +27,6 @@ if (config.firstRun) {
 		table.increments();
 		table.string('name').unique();
 		table.string('topic');
-		table;
 	}).then(() => {
 		knex('channels').insert({ name: 'general', topic: 'The beginning of it all.' })
 		.then(() => {});
@@ -38,6 +37,7 @@ if (config.firstRun) {
 }
 
 const channels = new Map();
+const usernames = [];
 
 knex.select('*').from('channels').then(rows => {
 	rows.map(channel => channels.set(channel.id, channel));
@@ -48,17 +48,41 @@ server.get('/', (req, res) => res.send('Ay, chatron server.'));
 
 io.on('connection', socket => {
 	socket.on('join', user => {
-		console.log(`User ${user.username} connected to the ${user.channels.join(', ')} channel(s).`);
+		if (usernames.includes(user.username)) return socket.emit('duplicateUsernameError', { message: 'Username is taken.' });
+		console.log(`User ${user.username} connected and joined the '${user.channels.join('\', \'')}' channel(s).`);
+		usernames.push(user.username);
+		socket.join(user.channels);
 	});
 
 	socket.on('leave', user => {
 		console.log(`User ${user.username} disconnected.`);
+		for (const channel of user.channels) {
+			socket.to(channel).emit('systemMessage', { content: `User ${user.username} has left.`, timestamp: moment().format('YYYY-MM-DD') });
+		}
+		usernames.splice(usernames.indexOf(user.username), 1);
 	});
 
 	socket.on('message', message => {
-		// update stuff before this
+		/*
+		update stuff before this
+		message properties: channel, author, content, timestamp
+		*/
 		io.sockets.emit('update', {
 			// emit updated stuff
 		});
+	});
+
+	socket.on('channelJoin', (user, channel) => {
+		if (user.channels.includes(channel)) return socket.emit('duplicateChannelError', { message: 'User is already in requested channel.' });
+		console.log(`User ${user.username} joined the '${channel}' channel.`);
+		socket.join([channel]);
+		socket.emit('channelJoin', (user, channel));
+	});
+
+	socket.on('channelLeave', (user, channel) => {
+		if (!user.channels.includes(channel)) return socket.emit('missingChannelError', { message: 'User is not requested in channel.' });
+		console.log(`User ${user.username} left the '${channel}' channel.`);
+		socket.leave(channel);
+		socket.emit('channelLeave', (user, channel));
 	});
 });
