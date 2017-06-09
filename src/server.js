@@ -55,7 +55,7 @@ io.on('connection', socket => {
 	});
 
 	socket.on('leave', user => {
-		console.log(`User ${user.username} disconnected.`);
+		console.log(`User ${user.username} disconnected and left all channels.`);
 		for (const channel of user.channels) {
 			socket.to(channel).emit('systemMessage', { content: `User ${user.username} has left.`, timestamp: moment().format('YYYY-MM-DD') });
 		}
@@ -72,14 +72,16 @@ io.on('connection', socket => {
 		});
 	});
 
-	socket.on('channelJoin', (user, channel) => {
+	socket.on('channelJoin', data => {
+		const user = data.user, channel = data.channel;
 		if (user.channels.includes(channel)) return socket.emit('duplicateChannelError', { message: 'User is already in requested channel.' });
 		console.log(`User ${user.username} joined the '${channel}' channel.`);
 		socket.join([channel]);
 		socket.emit('channelJoin', (user, channel));
 	});
 
-	socket.on('channelLeave', (user, channel) => {
+	socket.on('channelLeave', data => {
+		const user = data.user, channel = data.channel;
 		if (!user.channels.includes(channel)) return socket.emit('missingChannelError', { message: 'User is not requested in channel.' });
 		console.log(`User ${user.username} left the '${channel}' channel.`);
 		socket.leave(channel);
