@@ -29,7 +29,7 @@ if (config.firstRun) {
 		table.string('topic');
 	}).then(() => {
 		knex('channels').insert({ name: 'general', topic: 'The beginning of it all.' })
-		.then(() => {});
+		.then(() => null);
 	});
 
 	config.firstRun = false;
