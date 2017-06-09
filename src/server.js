@@ -82,7 +82,7 @@ io.on('connection', socket => {
 
 	socket.on('channelLeave', data => {
 		const user = data.user, channel = data.channel;
-		if (!user.channels.includes(channel)) return socket.emit('missingChannelError', { message: 'User is not requested in channel.' });
+		if (!user.channels.includes(channel)) return socket.emit('missingChannelError', { message: 'User is not in requested channel.' });
 		console.log(`User ${user.username} left the '${channel}' channel.`);
 		socket.leave(channel);
 		socket.emit('channelLeave', (user, channel));
