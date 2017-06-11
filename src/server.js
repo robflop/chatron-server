@@ -47,19 +47,38 @@ knex.select('*').from('channels').then(rows => {
 server.get('/', (req, res) => res.send('Ay, chatron server.'));
 
 io.on('connection', socket => {
-	socket.on('join', user => {
-		if (usernames.includes(user.username)) return socket.emit('duplicateUsernameError', { message: 'Username is taken.' });
-		console.log(`User ${user.username} connected and joined the '${user.channels.join('\', \'')}' channel(s).`);
+	socket.on('login', user => {
+		if (usernames.includes(user.username)) {
+			return socket.emit('duplicateUsernameError', { message: 'Username is taken.' });
+		}
+		if (user.username.length > 32 || user.username.length < 2) {
+			return socket.emit('usernameLengthError', { message: 'Username must be between 2 and 32 characters long.' });
+		}
+		user.channels.map(channel => {
+			if (channel.length > 32 || channel.length < 2) {
+				return socket.emit('channelLengthError', { message: `Channel names must be between 2 and 32 characters long. ('${channel}')` });
+			}
+			return null;
+		});
+		user.channels.map(channel => { // eslint-disable-line arrow-body-style
+			return socket.to(channel).emit('systemMessage', {
+				content: `User ${user.username} has joined.`,
+				timestamp: moment().format('YYYY-MM-DD')
+			});
+		});
 		usernames.push(user.username);
 		socket.join(user.channels);
+		console.log(`User ${user.username} connected and joined the '${user.channels.join('\', \'')}' channel(s).`);
+		socket.emit('loginSuccess', null);
 	});
 
-	socket.on('leave', user => {
+	socket.on('logout', user => {
 		console.log(`User ${user.username} disconnected and left all channels.`);
-		for (const channel of user.channels) {
-			socket.to(channel).emit('systemMessage', { content: `User ${user.username} has left.`, timestamp: moment().format('YYYY-MM-DD') });
-		}
+		user.channels.map(channel => { // eslint-disable-line arrow-body-style
+			return socket.to(channel).emit('systemMessage', { content: `User ${user.username} has left.`, timestamp: moment().format('YYYY-MM-DD') });
+		});
 		usernames.splice(usernames.indexOf(user.username), 1);
+		socket.emit('logoutSuccess', null);
 	});
 
 	socket.on('message', message => {
@@ -67,7 +86,7 @@ io.on('connection', socket => {
 		update stuff before this
 		message properties: channel, author, content, timestamp
 		*/
-		io.sockets.emit('update', {
+		socket.to(message.channel).emit('update', {
 			// emit updated stuff
 		});
 	});
@@ -75,16 +94,21 @@ io.on('connection', socket => {
 	socket.on('channelJoin', data => {
 		const user = data.user, channel = data.channel;
 		if (user.channels.includes(channel)) return socket.emit('duplicateChannelError', { message: 'User is already in requested channel.' });
+		if (channel.length > 32 || channel.length < 2) {
+			return socket.emit('channelLengthError', { message: `Channel names must be between 2 and 32 characters long. ('${channel}')` });
+		}
 		console.log(`User ${user.username} joined the '${channel}' channel.`);
 		socket.join([channel]);
-		socket.emit('channelJoin', (user, channel));
+		socket.to(channel).emit('systemMessage', { content: `User ${user.username} has joined.`, timestamp: moment().format('YYYY-MM-DD') });
+		socket.emit('channelJoinSuccess', (user, channel));
 	});
 
 	socket.on('channelLeave', data => {
 		const user = data.user, channel = data.channel;
 		if (!user.channels.includes(channel)) return socket.emit('missingChannelError', { message: 'User is not in requested channel.' });
 		console.log(`User ${user.username} left the '${channel}' channel.`);
+		socket.to(channel).emit('systemMessage', { content: `User ${user.username} has left.`, timestamp: moment().format('YYYY-MM-DD') });
 		socket.leave(channel);
-		socket.emit('channelLeave', (user, channel));
+		socket.emit('channelLeaveSuccess', (user, channel));
 	});
 });
