@@ -46,11 +46,16 @@ io.on('connection', socket => {
 		});
 
 		const channelNames = Object.keys(user.channels);
+		const userChannels = {};
+		for (const channelName of channelNames) {
+			userChannels[channelName] = channels[channelName];
+		}
+
 		users.push(user.username);
 		socket.join(channelNames);
 
 		console.log(`User ${user.username} connected and joined the '${channelNames.join('\', \'')}' channel(s).`);
-		socket.emit('channelData', channels);
+		socket.emit('channelData', userChannels);
 		return socket.emit('loginSuccess', null);
 	});
 
@@ -105,7 +110,7 @@ io.on('connection', socket => {
 		});
 
 		console.log(`User ${user.username} joined the '${channel}' channel.`);
-		socket.emit('channelJoinSuccess', (user, channel));
+		socket.emit('channelJoinSuccess', channel);
 	});
 
 	socket.on('channelLeave', (user, channel) => {
