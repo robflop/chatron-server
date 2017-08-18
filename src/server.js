@@ -38,8 +38,8 @@ io.on('connection', socket => {
 			}
 
 			channels.hasOwnProperty(channel.name)
-			? channels[channel.name].users.push(user.username)
-			: channels[channel.name] = { name: channel.name, users: [user.username] };
+				? channels[channel.name].users.push(user.username)
+				: channels[channel.name] = { name: channel.name, users: [user.username] };
 
 			return socket.to(channel.name).emit('systemMessage', {
 				content: `User ${user.username} has joined.`,
@@ -104,8 +104,8 @@ io.on('connection', socket => {
 		}
 
 		channels.hasOwnProperty(channel.name)
-		? channels[channel.name].users.push(user.username)
-		: channels[channel.name] = { name: channel.name, users: [user.username] };
+			? channels[channel.name].users.push(user.username)
+			: channels[channel.name] = { name: channel.name, users: [user.username] };
 
 		socket.join([channel.name]);
 		socket.to(channel.name).emit('systemMessage', {
@@ -131,8 +131,8 @@ io.on('connection', socket => {
 		const index = channels[channel.name].users.indexOf(user.username);
 
 		channels[channel.name].users.length - 1
-		? channels[channel.name].users.splice(index, 1)
-		: delete channels[channel.name];
+			? channels[channel.name].users.splice(index, 1)
+			: delete channels[channel.name];
 		// delete channel if removing this user would empty it completely
 
 		socket.to(channel.name).emit('systemMessage', {
