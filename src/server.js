@@ -16,19 +16,22 @@ http.listen(config.port, () => {
 const channels = {};
 const users = [];
 
-server.get('/', (req, res) => res.send('Ay, chatron server.'));
+server.get('/', (req, res) => res.send(`Chatron server listening on port ${config.port}`));
 
 io.on('connection', socket => {
 	socket.on('login', user => {
 		const loginData = { channels: {} };
 		if (users.includes(user.username) || user.username.toLowerCase() === 'system') {
-			return loginData.error = { type: 'duplicateUsernameError', message: 'Username is taken.' };
+			loginData.error = { type: 'duplicateUsernameError', message: 'Username is taken.' };
 		}
 		if (!user.username.length >= 2 && !user.username.length <= 32) {
-			return loginData.error = { type: 'usernameLengthError', message: 'Username must be between 2 and 32 characters long.' };
+			loginData.error = { type: 'usernameLengthError', message: 'Username must be between 2 and 32 characters long.' };
 		}
 
 		Object.values(user.channels).forEach(channel => {
+
+			if (loginData.error) return;
+
 			if (!channel.name.length >= 2 && !channel.name.length <= 32) {
 				return loginData.error = {
 					type: 'channelNameLengthError',
@@ -47,15 +50,19 @@ io.on('connection', socket => {
 			});
 		});
 
-		const channelNames = Object.keys(user.channels);
-		for (const channelName of channelNames) {
-			loginData.channels[channelName] = channels[channelName];
+		if (!loginData.error) {
+			const channelNames = Object.keys(user.channels);
+
+			for (const channelName of channelNames) {
+				loginData.channels[channelName] = channels[channelName];
+			}
+
+			users.push(user.username);
+			socket.join(channelNames);
+
+			console.log(`User ${user.username} connected and joined the '${channelNames.join('\', \'')}' channel(s).`);
 		}
 
-		users.push(user.username);
-		socket.join(channelNames);
-
-		console.log(`User ${user.username} connected and joined the '${channelNames.join('\', \'')}' channel(s).`);
 		return socket.emit('login', loginData);
 	});
 
@@ -63,9 +70,13 @@ io.on('connection', socket => {
 		users.splice(users.indexOf(user.username), 1);
 		Object.values(user.channels).forEach(channel => {
 			const index = channels[channel.name].users.indexOf(user.username);
-			channels[channel.name].users.splice(index, 1);
 
-			return socket.to(channel.name).emit('systemMessage', {
+			channels[channel.name].users.length - 1
+				? channels[channel.name].users.splice(index, 1)
+				: delete channels[channel.name];
+			// delete channel if removing this user would empty it completely
+
+			return socket.to(channel.name).emit('channelUserLeave', {
 				content: `User ${user.username} has left.`,
 				timestamp: moment().format('YYYY-MM-DD')
 			});
@@ -75,7 +86,7 @@ io.on('connection', socket => {
 		socket.emit('logout', null);
 	});
 
-	socket.on('messageSend', message => {
+	socket.on('message', message => {
 		/*
 		update stuff before this
 		message properties: channel, author, content, timestamp
@@ -103,17 +114,17 @@ io.on('connection', socket => {
 			};
 		}
 
-		channels.hasOwnProperty(channel.name)
-			? channels[channel.name].users.push(user.username)
-			: channels[channel.name] = { name: channel.name, users: [user.username] };
+		if (!channelData.error) {
+			channels.hasOwnProperty(channel.name)
+				? channels[channel.name].users.push(user.username)
+				: channels[channel.name] = { name: channel.name, users: [user.username] };
 
-		socket.join([channel.name]);
-		socket.to(channel.name).emit('systemMessage', {
-			content: `User ${user.username} has joined.`,
-			timestamp: moment().format('YYYY-MM-DD')
-		});
+			socket.join([channel.name]);
+			socket.to(channel.name).emit('channelUserAdd', { user: user.username });
 
-		console.log(`User ${user.username} joined the '${channel.name}' channel.`);
+			console.log(`User ${user.username} joined the '${channel.name}' channel.`);
+		}
+
 		socket.emit('channelJoin', channelData);
 	});
 
@@ -128,20 +139,20 @@ io.on('connection', socket => {
 			};
 		}
 
-		const index = channels[channel.name].users.indexOf(user.username);
+		if (!channelData.error) {
+			const index = channels[channel.name].users.indexOf(user.username);
 
-		channels[channel.name].users.length - 1
-			? channels[channel.name].users.splice(index, 1)
-			: delete channels[channel.name];
-		// delete channel if removing this user would empty it completely
+			channels[channel.name].users.length - 1
+				? channels[channel.name].users.splice(index, 1)
+				: delete channels[channel.name];
+			// delete channel if removing this user would empty it completely
 
-		socket.to(channel.name).emit('systemMessage', {
-			content: `User ${user.username} has left.`,
-			timestamp: moment().format('YYYY-MM-DD')
-		});
+			socket.to(channel.name).emit('channelUserLeave', { user: user.username });
+			socket.leave(channel.name);
 
-		socket.leave(channel.name);
-		console.log(`User ${user.username} left the '${channel.name}' channel.`);
+			console.log(`User ${user.username} left the '${channel.name}' channel.`);
+		}
+
 		socket.emit('channelLeave', channelData);
 	});
 });
