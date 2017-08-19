@@ -29,7 +29,6 @@ io.on('connection', socket => {
 		}
 
 		Object.values(user.channels).forEach(channel => {
-
 			if (loginData.error) return;
 
 			if (!channel.name.length >= 2 && !channel.name.length <= 32) {
