@@ -44,7 +44,7 @@ io.on('connection', socket => {
 				: channels[channel.name] = { name: channel.name, users: [user.username] };
 
 			return socket.to(channel.name).emit('systemMessage', {
-				content: `User ${user.username} has joined.`,
+				content: `User '${user.username}' has joined.`,
 				timestamp: moment().format('YYYY-MM-DD')
 			});
 		});
@@ -59,7 +59,7 @@ io.on('connection', socket => {
 			users.push(user.username);
 			socket.join(channelNames);
 
-			console.log(`User ${user.username} connected and joined the '${channelNames.join('\', \'')}' channel(s).`);
+			console.log(`User '${user.username}' connected and joined the '${channelNames.join('\', \'')}' channel(s).`);
 		}
 
 		return socket.emit('login', loginData);
@@ -76,12 +76,12 @@ io.on('connection', socket => {
 			// delete channel if removing this user would empty it completely
 
 			return socket.to(channel.name).emit('channelUserLeave', {
-				content: `User ${user.username} has left.`,
+				content: `User '${user.username}' has left.`,
 				timestamp: moment().format('YYYY-MM-DD')
 			});
 		});
 
-		console.log(`User ${user.username} disconnected and left all channels.`);
+		console.log(`User '${user.username}' disconnected and left all channels.`);
 		socket.emit('logout', null);
 	});
 
@@ -92,6 +92,10 @@ io.on('connection', socket => {
 		*/
 		socket.to(message.channel).emit('message', {
 			// emit updated stuff
+			author: message.author,
+			channel: channels.name,
+			content: message.content,
+			timestamp: message.timestamp
 		});
 	});
 
@@ -119,9 +123,9 @@ io.on('connection', socket => {
 				: channels[channel.name] = { name: channel.name, users: [user.username] };
 
 			socket.join([channel.name]);
-			socket.to(channel.name).emit('channelUserAdd', { user: user.username });
+			socket.to(channel.name).emit('channelUserEnter', { user: user.username, channel: channel.name });
 
-			console.log(`User ${user.username} joined the '${channel.name}' channel.`);
+			console.log(`User '${user.username}' joined the '${channel.name}' channel.`);
 		}
 
 		socket.emit('channelJoin', channelData);
@@ -146,10 +150,10 @@ io.on('connection', socket => {
 				: delete channels[channel.name];
 			// delete channel if removing this user would empty it completely
 
-			socket.to(channel.name).emit('channelUserLeave', { user: user.username });
+			socket.to(channel.name).emit('channelUserLeave', { user: user.username, channel: channel.name });
 			socket.leave(channel.name);
 
-			console.log(`User ${user.username} left the '${channel.name}' channel.`);
+			console.log(`User '${user.username}' left the '${channel.name}' channel.`);
 		}
 
 		socket.emit('channelLeave', channelData);
