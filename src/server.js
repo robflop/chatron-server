@@ -24,14 +24,14 @@ io.on('connection', socket => {
 		if (users.includes(user.username) || user.username.toLowerCase() === 'system') {
 			loginData.error = { type: 'duplicateUsernameError', message: 'Username is taken.' };
 		}
-		if (!user.username.length >= 2 && !user.username.length <= 32) {
+		if (user.username.length < 2 || user.username.length > 32) {
 			loginData.error = { type: 'usernameLengthError', message: 'Username must be between 2 and 32 characters long.' };
 		}
 
 		Object.values(user.channels).forEach(channel => {
 			if (loginData.error) return;
 
-			if (!channel.name.length >= 2 && !channel.name.length <= 32) {
+			if (channel.name.length < 2 || channel.name.length > 32) {
 				return loginData.error = {
 					type: 'channelNameLengthError',
 					message: 'Channel names must be between 2 and 32 characters long.',
@@ -105,7 +105,7 @@ io.on('connection', socket => {
 				channel: channel.name
 			};
 		}
-		if (!channel.name.length >= 2 && !channel.name.length <= 32) {
+		if (channel.name.length < 2 || channel.name.length > 32) {
 			channelData.error = {
 				type: 'channelNameLengthError',
 				message: 'Channel names must be between 2 and 32 characters long.',
