@@ -14,43 +14,7 @@ http.listen(config.port, () => {
 }); // info for self: listening using http because socket.io doesn't take an express instance (see socket.io docs)
 
 const channels = {};
-/*
-	channels structure something like this:
-	channels = { 
-		abc: {
-			users: ['one', 'two', 'three'],
-			messages: [
-				{
-					author: 'one',
-					content: 'two sucks',
-					timestamp: '13:37',
-					channel: 'abc'
-				},
-				{
-					author: 'three',
-					content: 'one is the best',
-					timestamp: '04:20',
-					channel: 'abc'
-				}
-			]
-		},
-		def: { ... }
-	 }
-*/
 const users = [];
-/*
-	 users structure something like this:
-	 users = [
-		 {
-			 username: 'one',
-			 channels: ['abc', 'def']
-		 },
-		 {
-			username: 'two',
-			channels: ['haha', 'hello']
-		 }
-	 ]
-*/
 
 server.get('/', (req, res) => res.send(`Chatron server listening on port ${config.port}.`));
 

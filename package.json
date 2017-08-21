@@ -1,13 +1,11 @@
 {
   "name": "chatron-server",
-  "version": "0.0.1",
+  "version": "1.0.0",
   "description": "A chatroom server built with electron and socket.io.",
   "main": "./src/server",
   "dependencies": {
-    "chalk": "^2.1.0",
     "express": "^4.15.4",
     "moment": "^2.18.1",
-    "snekfetch": "^3.2.9",
     "socket.io": "^2.0.3"
   },
   "devDependencies": {
