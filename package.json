@@ -16,7 +16,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/robflop/chatron-client.git"
+    "url": "git+https://github.com/robflop/chatron-server.git"
   },
   "keywords": [
     "chatrooms",
@@ -28,9 +28,9 @@
   "author": "robflop",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/robflop/chatron-client/issues"
+    "url": "https://github.com/robflop/chatron-server/issues"
   },
-  "homepage": "https://github.com/robflop/chatron-client#readme",
+  "homepage": "https://github.com/robflop/chatron-server#readme",
   "engines": {
 	  "node": "7.6.0"
   }

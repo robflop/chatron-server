@@ -94,6 +94,7 @@ io.on('connection', socket => {
 		}
 
 		// return socket.to(message.channel.name).emit('message', message);
+		// only sending to room doesn't seem to work? ^
 		return io.sockets.emit('message', message);
 	});
 
