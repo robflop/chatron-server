@@ -80,22 +80,32 @@ io.on('connection', socket => {
 	});
 
 	socket.on('message', message => {
-		const messageData = message;
+		const messageData = {};
+
+		if (message.content.length === 0) {
+			messageData.error = {
+				type: 'emptyMessageError',
+				message: 'Messages may not be empty.',
+				channel: message.channel.name
+			};
+		}
+
 		if (message.content.length > 2000) {
 			messageData.error = {
 				type: 'maxCharLimitError',
-				message: 'Messages may not be longer than 2000 characters',
+				message: 'Messages may not be longer than 2000 characters.',
 				channel: message.channel.name
 			};
 		}
 
 		if (!messageData.error) {
 			channels[message.channel.name].messages.push(message);
+			Object.assign(messageData, message);
 		}
 
 		// return socket.to(message.channel.name).emit('message', message);
 		// only sending to room doesn't seem to work? ^
-		return io.sockets.emit('message', message);
+		return io.sockets.emit('message', messageData);
 	});
 
 	socket.on('channelJoin', (user, userChannels) => {
