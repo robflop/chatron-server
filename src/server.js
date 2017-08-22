@@ -2,6 +2,7 @@ const moment = require('moment');
 const express = require('express');
 const { writeFileSync } = require('fs');
 const config = require('./config.json');
+const { name, version } = require('../package.json');
 
 const server = express();
 const http = require('http').Server(server);
@@ -10,7 +11,7 @@ const io = require('socket.io')(http);
 const timestamp = moment().format('DD/MM/YYYY HH:mm:ss');
 
 http.listen(config.port, () => {
-	console.log(`[${timestamp}] chatron server running on port ${config.port}!${config.SSLproxy ? ' (Proxied to SSL)' : ''}`);
+	console.log(`[${timestamp}] ${name} v${version} running on port ${config.port}!${config.SSLproxy ? ' (Proxied to SSL)' : ''}`);
 }); // info for self: listening using http because socket.io doesn't take an express instance (see socket.io docs)
 
 const channels = {};
