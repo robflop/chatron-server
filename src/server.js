@@ -21,6 +21,7 @@ server.get('/', (req, res) => res.send(`Chatron server listening on port ${confi
 
 io.on('connection', socket => {
 	socket.on('login', user => {
+		const timestamp = moment().format('DD/MM/YYYY HH:mm:ss');
 		const loginData = { channels: {} };
 		if (users.hasOwnProperty(user.username) || user.username.toLowerCase() === 'system') {
 			loginData.error = { type: 'duplicateUsernameError', message: 'Username is taken.' };
@@ -67,13 +68,14 @@ io.on('connection', socket => {
 			users[user.username] = user;
 			socket.join(channelNames);
 
-			console.log(`User '${user.username}' connected and joined the '${channelNames.join('\', \'')}' channel(s).`);
+			console.log(`[${timestamp}] User '${user.username}' connected and joined the '${channelNames.join('\', \'')}' channel(s).`);
 		}
 
 		return socket.emit('login', loginData);
 	});
 
 	socket.on('channelJoin', (user, userChannels) => {
+		const timestamp = moment().format('DD/MM/YYYY HH:mm:ss');
 		const channelData = { channels: [] };
 
 		userChannels.forEach(channel => {
@@ -115,11 +117,12 @@ io.on('connection', socket => {
 			}
 		});
 
-		console.log(`User '${user.username}' joined the '${userChannels.map(c => c.name).join(', ')}' channel(s).`);
+		console.log(`[${timestamp}] User '${user.username}' joined the '${userChannels.map(c => c.name).join(', ')}' channel(s).`);
 		socket.emit('channelJoin', channelData);
 	});
 
 	socket.on('channelLeave', (user, userChannels) => {
+		const timestamp = moment().format('DD/MM/YYYY HH:mm:ss');
 		const channelData = { channels: [] };
 
 		userChannels.forEach(channel => {
@@ -155,11 +158,12 @@ io.on('connection', socket => {
 			}
 		});
 
-		console.log(`User '${user.username}' left the '${userChannels.map(c => c.name).join(', ')}' channel(s).`);
+		console.log(`[${timestamp}] User '${user.username}' left the '${userChannels.map(c => c.name).join(', ')}' channel(s).`);
 		socket.emit('channelLeave', channelData);
 	});
 
 	socket.on('message', message => {
+		const timestamp = moment().format('DD/MM/YYYY HH:mm:ss');
 		const messageData = {};
 
 		if (message.content.length === 0) {
@@ -187,6 +191,7 @@ io.on('connection', socket => {
 	});
 
 	socket.on('logout', user => {
+		const timestamp = moment().format('DD/MM/YYYY HH:mm:ss');
 		delete users[user.username];
 		Object.values(user.channels).forEach(channel => {
 			const systemMessage = {
@@ -207,7 +212,7 @@ io.on('connection', socket => {
 			return io.to(channel.name).emit('channelUserLeave', { username: user.username }, { name: channel.name });
 		});
 
-		console.log(`User '${user.username}' disconnected and left all channels.`);
+		console.log(`[${timestamp}] User '${user.username}' disconnected and left all channels.`);
 		socket.emit('logout', null);
 	});
 });
