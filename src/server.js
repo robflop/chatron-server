@@ -14,14 +14,14 @@ http.listen(config.port, () => {
 }); // info for self: listening using http because socket.io doesn't take an express instance (see socket.io docs)
 
 const channels = {};
-const users = [];
+const users = {};
 
 server.get('/', (req, res) => res.send(`Chatron server listening on port ${config.port}.`));
 
 io.on('connection', socket => {
 	socket.on('login', user => {
 		const loginData = { channels: {} };
-		if (users.includes(user) || user.username.toLowerCase() === 'system') {
+		if (users.hasOwnProperty(user.username) || user.username.toLowerCase() === 'system') {
 			loginData.error = { type: 'duplicateUsernameError', message: 'Username is taken.' };
 		}
 		if (user.username.length < 2 || user.username.length > 32) {
@@ -40,8 +40,8 @@ io.on('connection', socket => {
 			}
 
 			channels.hasOwnProperty(channel.name)
-				? channels[channel.name].users.push(user)
-				: channels[channel.name] = { name: channel.name, users: [user], messages: [] };
+				? channels[channel.name].users[user.username] = user
+				: channels[channel.name] = { name: channel.name, users: { [user.username]: user }, messages: [] };
 
 			return socket.to(channel.name).emit('channelUserEnter', { username: user.username }, { name: channel.name });
 		});
@@ -53,7 +53,7 @@ io.on('connection', socket => {
 				loginData.channels[channelName] = channels[channelName];
 			}
 
-			users.push(user);
+			users[user.username] = user;
 			socket.join(channelNames);
 
 			console.log(`User '${user.username}' connected and joined the '${channelNames.join('\', \'')}' channel(s).`);
@@ -63,12 +63,10 @@ io.on('connection', socket => {
 	});
 
 	socket.on('logout', user => {
-		users.splice(users.indexOf(user), 1);
+		delete users[user.username];
 		Object.values(user.channels).forEach(channel => {
-			const index = channels[channel.name].users.indexOf(user);
-
-			channels[channel.name].users.length - 1
-				? channels[channel.name].users.splice(index, 1)
+			Object.keys(channels[channel.name].users).length - 1
+				? delete channels[channel.name].users[user.username]
 				: delete channels[channel.name];
 			// delete channel if removing this user would empty it completely
 
@@ -129,8 +127,8 @@ io.on('connection', socket => {
 
 			if (!channelData.error) {
 				channels.hasOwnProperty(channel.name)
-					? channels[channel.name].users.push(user)
-					: channels[channel.name] = { name: channel.name, users: [user], messages: [] };
+					? channels[channel.name].users[user.username] = user
+					: channels[channel.name] = { name: channel.name, users: { [user.username]: user }, messages: [] };
 
 				channelData.channels.push(channels[channel.name]);
 
@@ -156,14 +154,12 @@ io.on('connection', socket => {
 			}
 
 			if (!channelData.error) {
-				const index = channels[channel.name].users.indexOf(user);
-
-				channels[channel.name].users.length - 1
-					? channels[channel.name].users.splice(index, 1)
+				Object.keys(channels[channel.name].users).length - 1
+					? delete channels[channel.name].users[user.username]
 					: delete channels[channel.name];
 				// delete channel if removing this user would empty it completely
 
-				channelData.channels.push(channels[channel.name] || { name: channel.name, users: [], messages: [] });
+				channelData.channels.push(channels[channel.name] || { name: channel.name, users: { [user.username]: user }, messages: [] });
 				// either the channel itself or an empty one if it was just deleted
 
 				socket.to(channel.name).emit('channelUserLeave', { username: user.username }, { name: channel.name });
