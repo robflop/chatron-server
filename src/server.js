@@ -51,10 +51,10 @@ io.on('connection', socket => {
 				channel: { name: channel.name }
 			};
 
-			socket.to(channel.name).emit('message', systemMessage);
+			io.to(channel.name).emit('message', systemMessage);
 			channels[channel.name].messages.push(systemMessage);
 
-			return socket.to(channel.name).emit('channelUserEnter', { username: user.username }, { name: channel.name });
+			return io.to(channel.name).emit('channelUserEnter', { username: user.username }, { name: channel.name });
 		});
 
 		if (!loginData.error) {
@@ -108,10 +108,10 @@ io.on('connection', socket => {
 					channel: { name: channel.name }
 				};
 
-				socket.to(channel.name).emit('message', systemMessage);
+				io.to(channel.name).emit('message', systemMessage);
 				channels[channel.name].messages.push(systemMessage);
 
-				socket.to(channel.name).emit('channelUserEnter', { username: user.username }, { name: channel.name });
+				io.to(channel.name).emit('channelUserEnter', { username: user.username }, { name: channel.name });
 			}
 		});
 
@@ -142,7 +142,7 @@ io.on('connection', socket => {
 					channel: { name: channel.name }
 				};
 
-				socket.to(channel.name).emit('message', systemMessage);
+				io.to(channel.name).emit('message', systemMessage);
 				channels[channel.name].messages.push(systemMessage);
 
 				Object.keys(channels[channel.name].users).length - 1
@@ -150,7 +150,7 @@ io.on('connection', socket => {
 					: delete channels[channel.name];
 				// delete channel if removing this user would empty it completely
 
-				socket.to(channel.name).emit('channelUserLeave', { username: user.username }, { name: channel.name });
+				io.to(channel.name).emit('channelUserLeave', { username: user.username }, { name: channel.name });
 				socket.leave(channel.name);
 			}
 		});
@@ -183,9 +183,7 @@ io.on('connection', socket => {
 			Object.assign(messageData, message);
 		}
 
-		// return socket.to(message.channel.name).emit('message', message);
-		// only sending to room doesn't seem to work? ^
-		return io.sockets.emit('message', messageData);
+		return io.to(message.channel.name).emit('message', messageData);
 	});
 
 	socket.on('logout', user => {
@@ -198,7 +196,7 @@ io.on('connection', socket => {
 				channel: { name: channel.name }
 			};
 
-			socket.to(channel.name).emit('message', systemMessage);
+			io.to(channel.name).emit('message', systemMessage);
 			channels[channel.name].messages.push(systemMessage);
 
 			Object.keys(channels[channel.name].users).length - 1
@@ -206,7 +204,7 @@ io.on('connection', socket => {
 				: delete channels[channel.name];
 			// delete channel if removing this user would empty it completely
 
-			return socket.to(channel.name).emit('channelUserLeave', { username: user.username }, { name: channel.name });
+			return io.to(channel.name).emit('channelUserLeave', { username: user.username }, { name: channel.name });
 		});
 
 		console.log(`User '${user.username}' disconnected and left all channels.`);
