@@ -132,11 +132,6 @@ io.on('connection', socket => {
 			}
 
 			if (!channelData.error) {
-				Object.keys(channels[channel.name].users).length - 1
-					? delete channels[channel.name].users[user.username]
-					: delete channels[channel.name];
-				// delete channel if removing this user would empty it completely
-
 				channelData.channels.push(channels[channel.name] || { name: channel.name, users: { [user.username]: user }, messages: [] });
 				// either the channel itself or an empty one if it was just deleted
 
@@ -149,6 +144,11 @@ io.on('connection', socket => {
 
 				socket.to(channel.name).emit('message', systemMessage);
 				channels[channel.name].messages.push(systemMessage);
+
+				Object.keys(channels[channel.name].users).length - 1
+					? delete channels[channel.name].users[user.username]
+					: delete channels[channel.name];
+				// delete channel if removing this user would empty it completely
 
 				socket.to(channel.name).emit('channelUserLeave', { username: user.username }, { name: channel.name });
 				socket.leave(channel.name);
@@ -191,11 +191,6 @@ io.on('connection', socket => {
 	socket.on('logout', user => {
 		delete users[user.username];
 		Object.values(user.channels).forEach(channel => {
-			Object.keys(channels[channel.name].users).length - 1
-				? delete channels[channel.name].users[user.username]
-				: delete channels[channel.name];
-			// delete channel if removing this user would empty it completely
-
 			const systemMessage = {
 				content: `<b>${user.username}</b> has left.`,
 				author: { username: 'system' },
@@ -205,6 +200,11 @@ io.on('connection', socket => {
 
 			socket.to(channel.name).emit('message', systemMessage);
 			channels[channel.name].messages.push(systemMessage);
+
+			Object.keys(channels[channel.name].users).length - 1
+				? delete channels[channel.name].users[user.username]
+				: delete channels[channel.name];
+			// delete channel if removing this user would empty it completely
 
 			return socket.to(channel.name).emit('channelUserLeave', { username: user.username }, { name: channel.name });
 		});
