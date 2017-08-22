@@ -44,6 +44,16 @@ io.on('connection', socket => {
 				? channels[channel.name].users[user.username] = user
 				: channels[channel.name] = { name: channel.name, users: { [user.username]: user }, messages: [] };
 
+			const systemMessage = {
+				content: `<b>${user.username}</b> has joined.`,
+				author: { username: 'system' },
+				timestamp: Date.now(), // unix timestamp to account for timezones
+				channel: { name: channel.name }
+			};
+
+			socket.to(channel.name).emit('message', systemMessage);
+			channels[channel.name].messages.push(systemMessage);
+
 			return socket.to(channel.name).emit('channelUserEnter', { username: user.username }, { name: channel.name });
 		});
 
@@ -90,6 +100,17 @@ io.on('connection', socket => {
 				channelData.channels.push(channels[channel.name]);
 
 				socket.join([channel.name]);
+
+				const systemMessage = {
+					content: `<b>${user.username}</b> has joined.`,
+					author: { username: 'system' },
+					timestamp: Date.now(), // unix timestamp to account for timezones
+					channel: { name: channel.name }
+				};
+
+				socket.to(channel.name).emit('message', systemMessage);
+				channels[channel.name].messages.push(systemMessage);
+
 				socket.to(channel.name).emit('channelUserEnter', { username: user.username }, { name: channel.name });
 			}
 		});
@@ -118,6 +139,16 @@ io.on('connection', socket => {
 
 				channelData.channels.push(channels[channel.name] || { name: channel.name, users: { [user.username]: user }, messages: [] });
 				// either the channel itself or an empty one if it was just deleted
+
+				const systemMessage = {
+					content: `<b>${user.username}</b> has left.`,
+					author: { username: 'system' },
+					timestamp: Date.now(), // unix timestamp to account for timezones
+					channel: { name: channel.name }
+				};
+
+				socket.to(channel.name).emit('message', systemMessage);
+				channels[channel.name].messages.push(systemMessage);
 
 				socket.to(channel.name).emit('channelUserLeave', { username: user.username }, { name: channel.name });
 				socket.leave(channel.name);
@@ -164,6 +195,16 @@ io.on('connection', socket => {
 				? delete channels[channel.name].users[user.username]
 				: delete channels[channel.name];
 			// delete channel if removing this user would empty it completely
+
+			const systemMessage = {
+				content: `<b>${user.username}</b> has left.`,
+				author: { username: 'system' },
+				timestamp: Date.now(), // unix timestamp to account for timezones
+				channel: { name: channel.name }
+			};
+
+			socket.to(channel.name).emit('message', systemMessage);
+			channels[channel.name].messages.push(systemMessage);
 
 			return socket.to(channel.name).emit('channelUserLeave', { username: user.username }, { name: channel.name });
 		});
