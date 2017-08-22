@@ -21,7 +21,7 @@ server.get('/', (req, res) => res.send(`Chatron server listening on port ${confi
 io.on('connection', socket => {
 	socket.on('login', user => {
 		const loginData = { channels: {} };
-		if (users.includes(user.username) || user.username.toLowerCase() === 'system') {
+		if (users.includes(user) || user.username.toLowerCase() === 'system') {
 			loginData.error = { type: 'duplicateUsernameError', message: 'Username is taken.' };
 		}
 		if (user.username.length < 2 || user.username.length > 32) {
@@ -40,8 +40,8 @@ io.on('connection', socket => {
 			}
 
 			channels.hasOwnProperty(channel.name)
-				? channels[channel.name].users.push(user.username)
-				: channels[channel.name] = { name: channel.name, users: [user.username], messages: [] };
+				? channels[channel.name].users.push(user)
+				: channels[channel.name] = { name: channel.name, users: [user], messages: [] };
 
 			return socket.to(channel.name).emit('channelUserEnter', { username: user.username }, { name: channel.name });
 		});
@@ -53,7 +53,7 @@ io.on('connection', socket => {
 				loginData.channels[channelName] = channels[channelName];
 			}
 
-			users.push(user.username);
+			users.push(user);
 			socket.join(channelNames);
 
 			console.log(`User '${user.username}' connected and joined the '${channelNames.join('\', \'')}' channel(s).`);
@@ -63,9 +63,9 @@ io.on('connection', socket => {
 	});
 
 	socket.on('logout', user => {
-		users.splice(users.indexOf(user.username), 1);
+		users.splice(users.indexOf(user), 1);
 		Object.values(user.channels).forEach(channel => {
-			const index = channels[channel.name].users.indexOf(user.username);
+			const index = channels[channel.name].users.indexOf(user);
 
 			channels[channel.name].users.length - 1
 				? channels[channel.name].users.splice(index, 1)
@@ -129,8 +129,8 @@ io.on('connection', socket => {
 
 			if (!channelData.error) {
 				channels.hasOwnProperty(channel.name)
-					? channels[channel.name].users.push(user.username)
-					: channels[channel.name] = { name: channel.name, users: [user.username], messages: [] };
+					? channels[channel.name].users.push(user)
+					: channels[channel.name] = { name: channel.name, users: [user], messages: [] };
 
 				channelData.channels.push(channels[channel.name]);
 
@@ -156,7 +156,7 @@ io.on('connection', socket => {
 			}
 
 			if (!channelData.error) {
-				const index = channels[channel.name].users.indexOf(user.username);
+				const index = channels[channel.name].users.indexOf(user);
 
 				channels[channel.name].users.length - 1
 					? channels[channel.name].users.splice(index, 1)
