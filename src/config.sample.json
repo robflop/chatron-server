@@ -1,7 +1,4 @@
 {
-	"firstRun": true,
 	"port": 5959,
-	"SSLproxy": false,
-	"databasePath": "./db/db.db",
-	"updateInterval": 30
+	"SSLproxy": false
 }
