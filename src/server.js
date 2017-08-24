@@ -8,20 +8,50 @@ const server = express();
 const http = require('http').Server(server);
 const io = require('socket.io')(http);
 
-const timestamp = moment().format('DD/MM/YYYY HH:mm:ss');
-
 http.listen(config.port, () => {
-	console.log(`[${timestamp}] ${name} v${version} running on port ${config.port}!${config.SSLproxy ? ' (Proxied to SSL)' : ''}`);
+	console.log(`[${events.timestamp}] ${name} v${version} running on port ${config.port}!${config.SSLproxy ? ' (Proxied to SSL)' : ''}`);
 }); // info for self: listening using http because socket.io doesn't take an express instance (see socket.io docs)
 
 const channels = {};
 const users = {};
+const sockets = {};
+// to look up which user belongs to which socket
 
 server.get('/', (req, res) => res.send(`Chatron server listening on port ${config.port}.`));
 
 io.on('connection', socket => {
 	socket.on('login', user => {
-		const timestamp = moment().format('DD/MM/YYYY HH:mm:ss');
+		events.login(user, socket);
+	});
+
+	socket.on('channelJoin', (user, userChannels) => {
+		events.channelJoin(user, userChannels, socket);
+	});
+
+	socket.on('channelLeave', (user, userChannels) => {
+		events.channelLeave(user, userChannels, socket);
+	});
+
+	socket.on('message', message => {
+		events.message(message, socket);
+	});
+
+	socket.on('logout', user => {
+		events.deleteUser(user, socket);
+	});
+
+	socket.on('disconnect', reason => {
+		const user = sockets[socket.id];
+		if (user && users.hasOwnProperty(user.username)) events.deleteUser(user, socket);
+	});
+});
+
+const events = {
+	get timestamp() {
+		return moment().format('DD/MM/YYYY HH:mm:ss');
+	},
+
+	login(user, socket) {
 		const loginData = { channels: {} };
 		if (users.hasOwnProperty(user.username) || user.username.toLowerCase() === 'system') {
 			loginData.error = { type: 'duplicateUsernameError', message: 'Username is taken.' };
@@ -29,6 +59,8 @@ io.on('connection', socket => {
 		if (user.username.length < 2 || user.username.length > 32) {
 			loginData.error = { type: 'usernameLengthError', message: 'Username must be between 2 and 32 characters long.' };
 		}
+
+		sockets[socket.id] = user;
 
 		Object.values(user.channels).forEach(channel => {
 			if (loginData.error) return;
@@ -68,14 +100,13 @@ io.on('connection', socket => {
 			users[user.username] = user;
 			socket.join(channelNames);
 
-			console.log(`[${timestamp}] User '${user.username}' connected and joined the '${channelNames.join('\', \'')}' channel(s).`);
+			console.log(`[${events.timestamp}] User '${user.username}' connected and joined the '${channelNames.join('\', \'')}' channel(s).`);
 		}
 
 		return socket.emit('login', loginData);
-	});
+	},
 
-	socket.on('channelJoin', (user, userChannels) => {
-		const timestamp = moment().format('DD/MM/YYYY HH:mm:ss');
+	channelJoin(user, userChannels, socket) {
 		const channelData = { channels: [] };
 
 		userChannels.forEach(channel => {
@@ -117,12 +148,11 @@ io.on('connection', socket => {
 			}
 		});
 
-		console.log(`[${timestamp}] User '${user.username}' joined the '${userChannels.map(c => c.name).join(', ')}' channel(s).`);
+		console.log(`[${events.timestamp}] User '${user.username}' joined the '${userChannels.map(c => c.name).join(', ')}' channel(s).`);
 		socket.emit('channelJoin', channelData);
-	});
+	},
 
-	socket.on('channelLeave', (user, userChannels) => {
-		const timestamp = moment().format('DD/MM/YYYY HH:mm:ss');
+	channelLeave(user, userChannels, socket) {
 		const channelData = { channels: [] };
 
 		userChannels.forEach(channel => {
@@ -158,12 +188,11 @@ io.on('connection', socket => {
 			}
 		});
 
-		console.log(`[${timestamp}] User '${user.username}' left the '${userChannels.map(c => c.name).join(', ')}' channel(s).`);
+		console.log(`[${events.timestamp}] User '${user.username}' left the '${userChannels.map(c => c.name).join(', ')}' channel(s).`);
 		socket.emit('channelLeave', channelData);
-	});
+	},
 
-	socket.on('message', message => {
-		const timestamp = moment().format('DD/MM/YYYY HH:mm:ss');
+	message(message, socket) {
 		const messageData = {};
 
 		if (message.content.length === 0) {
@@ -188,11 +217,11 @@ io.on('connection', socket => {
 		}
 
 		return io.to(message.channel.name).emit('message', messageData);
-	});
+	},
 
-	socket.on('logout', user => {
-		const timestamp = moment().format('DD/MM/YYYY HH:mm:ss');
+	deleteUser(user, socket) {
 		delete users[user.username];
+		delete sockets[socket.id];
 		Object.values(user.channels).forEach(channel => {
 			const systemMessage = {
 				content: `<b>${user.username}</b> has left.`,
@@ -212,7 +241,7 @@ io.on('connection', socket => {
 			return io.to(channel.name).emit('channelUserLeave', { username: user.username }, { name: channel.name });
 		});
 
-		console.log(`[${timestamp}] User '${user.username}' disconnected and left all channels.`);
+		console.log(`[${events.timestamp}] User '${user.username}' disconnected and left all channels.`);
 		socket.emit('logout', null);
-	});
-});
+	}
+};
