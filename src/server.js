@@ -143,6 +143,9 @@ const events = {
 			}
 
 			if (!channelData.error) {
+				user.channels[channel.name] = channel;
+				users[user.username].channels = user.channels;
+
 				channels.hasOwnProperty(channel.name)
 					? channels[channel.name].users[user.username] = user
 					: channels[channel.name] = { name: channel.name, users: { [user.username]: user }, messages: [] };
@@ -201,6 +204,8 @@ const events = {
 			if (!channelData.error) {
 				channelData.channels.push(channels[channel.name] || { name: channel.name, users: { [user.username]: user }, messages: [] });
 				// either the channel itself or an empty one if it was just deleted
+				delete user.channels[channel.name];
+				users[user.username].channels = user.channels;
 
 				const systemMessage = {
 					content: `<b>${user.username}</b> has left.`,
