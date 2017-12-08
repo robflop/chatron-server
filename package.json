@@ -1,15 +1,15 @@
 {
   "name": "chatron-server",
-  "version": "1.2.0",
-  "description": "A chatroom server built with electron and socket.io.",
+  "version": "2.0.0",
+  "description": "A chatroom server built with electron and uws.",
   "main": "./src/server",
   "dependencies": {
-    "express": "^4.15.4",
-    "moment": "^2.18.1",
-    "socket.io": "^2.0.3"
+    "express": "^4.16.2",
+    "moment": "^2.19.3",
+    "uws": "^9.14.0"
   },
   "devDependencies": {
-    "eslint": "^4.4.1"
+    "eslint": "^4.12.1"
   },
   "scripts": {
     "test": "eslint src"
@@ -21,7 +21,7 @@
   "keywords": [
     "chatrooms",
     "server",
-    "socket.io",
+    "uws",
     "electron",
     "node"
   ],

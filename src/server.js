@@ -6,43 +6,45 @@ const { name, version } = require('../package.json');
 
 const server = express();
 const http = require('http').Server(server);
-const io = require('socket.io')(http);
+const uws = require('uws');
 
 http.listen(config.port, () => {
 	console.log(`[${events.timestamp}] ${name} v${version} running on port ${config.port}!${config.SSLproxy ? ' (Proxied to SSL)' : ''}`);
-}); // info for self: listening using http because socket.io doesn't take an express instance (see socket.io docs)
+});
 
 const channels = {};
 const users = {};
 const sockets = {};
+let socketID = 0;
 // to look up which user belongs to which socket
 
 server.get('/', (req, res) => res.send(`Chatron server listening on port ${config.port}.`));
 
-io.on('connection', socket => {
-	socket.on('login', user => {
-		events.login(user, socket);
-	});
+const socketServer = new uws.Server({ server: http });
 
-	socket.on('channelJoin', (user, userChannels) => {
-		events.channelJoin(user, userChannels, socket);
-	});
-
-	socket.on('channelLeave', (user, userChannels) => {
-		events.channelLeave(user, userChannels, socket);
-	});
+socketServer.on('connection', socket => {
+	socket.pingInterval = setInterval(() => socket.ping(), 1000 * 45);
+	socket.id = ++socketID;
+	sockets[socket.id] = socket;
 
 	socket.on('message', message => {
-		events.message(message, socket);
+		const data = JSON.parse(message);
+
+		if (data.type === 'login') events.login(data.user, socket);
+		if (data.type === 'channelJoin') events.channelJoin(data.user, data.userChannels, socket);
+		if (data.type === 'channelLeave') events.channelLeave(data.user, data.userChannels, socket);
+		if (data.type === 'userMessage') events.userMessage(data.message, socket);
+		if (data.type === 'logout') events.deleteUser(data.user, socket);
 	});
 
-	socket.on('logout', user => {
-		events.deleteUser(user, socket);
-	});
+	socket.on('close', () => {
+		let user;
 
-	socket.on('disconnect', reason => {
-		const user = sockets[socket.id];
-		if (user && users.hasOwnProperty(user.username)) events.deleteUser(user, socket);
+		Object.values(users).forEach(u => {
+			if (u.id === socket.id) return user = u;
+		});
+
+		if (user) events.deleteUser(user, socket);
 	});
 });
 
@@ -53,14 +55,14 @@ const events = {
 
 	login(user, socket) {
 		const loginData = { channels: {} };
+		user.id = sockets[socket.id].id;
+
 		if (users.hasOwnProperty(user.username) || user.username.toLowerCase() === 'system') {
 			loginData.error = { type: 'duplicateUsernameError', message: 'Username is taken.' };
 		}
 		if (user.username.length < 2 || user.username.length > 32) {
 			loginData.error = { type: 'usernameLengthError', message: 'Username must be between 2 and 32 characters long.' };
 		}
-
-		sockets[socket.id] = user;
 
 		Object.values(user.channels).forEach(channel => {
 			if (loginData.error) return;
@@ -84,10 +86,26 @@ const events = {
 				channel: { name: channel.name }
 			};
 
-			io.to(channel.name).emit('message', systemMessage);
+			Object.values(users).forEach(chatronUser => {
+				if (Object.keys(users).length === 0) return;
+
+				if (chatronUser.channels.hasOwnProperty(channel.name)) {
+					sockets[chatronUser.id].send(JSON.stringify({ type: 'userMessage', userMessage: systemMessage }));
+				}
+			});
 			channels[channel.name].messages.push(systemMessage);
 
-			return io.to(channel.name).emit('channelUserEnter', { username: user.username }, { name: channel.name });
+			Object.values(users).forEach(chatronUser => {
+				if (Object.keys(users).length === 0) return;
+
+				if (chatronUser.channels.hasOwnProperty(channel.name)) {
+					sockets[chatronUser.id].send(JSON.stringify({
+						type: 'channelUserEnter',
+						user: { username: user.username },
+						channel: { name: channel.name }
+					}));
+				}
+			});
 		});
 
 		if (!loginData.error) {
@@ -98,12 +116,11 @@ const events = {
 			}
 
 			users[user.username] = user;
-			socket.join(channelNames);
 
 			console.log(`[${events.timestamp}] User '${user.username}' connected and joined the '${channelNames.join('\', \'')}' channel(s).`);
 		}
 
-		return socket.emit('login', loginData);
+		return socket.send(JSON.stringify({ type: 'login', loginData }));
 	},
 
 	channelJoin(user, userChannels, socket) {
@@ -132,8 +149,6 @@ const events = {
 
 				channelData.channels.push(channels[channel.name]);
 
-				socket.join([channel.name]);
-
 				const systemMessage = {
 					content: `<b>${user.username}</b> has joined.`,
 					author: { username: 'system' },
@@ -141,15 +156,34 @@ const events = {
 					channel: { name: channel.name }
 				};
 
-				io.to(channel.name).emit('message', systemMessage);
+				Object.values(users).forEach(chatronUser => {
+					if (Object.keys(users).length === 0) return;
+
+					if (chatronUser.channels.hasOwnProperty(channel.name)) {
+						sockets[chatronUser.id].send(JSON.stringify({ type: 'userMessage', userMessage: systemMessage }));
+					}
+				});
 				channels[channel.name].messages.push(systemMessage);
 
-				io.to(channel.name).emit('channelUserEnter', { username: user.username }, { name: channel.name });
+				Object.values(users).forEach(chatronUser => {
+					if (Object.keys(users).length === 0) return;
+
+					if (chatronUser.channels.hasOwnProperty(channel.name)) {
+						sockets[chatronUser.id].send(JSON.stringify({
+							type: 'channelUserEnter',
+							user: { username: user.username },
+							channel: { name: channel.name }
+						}));
+					}
+				});
 			}
 		});
 
-		console.log(`[${events.timestamp}] User '${user.username}' joined the '${userChannels.map(c => c.name).join(', ')}' channel(s).`);
-		socket.emit('channelJoin', channelData);
+		if (!channelData.error) {
+			console.log(`[${events.timestamp}] User '${user.username}' joined the '${userChannels.map(c => c.name).join(', ')}' channel(s).`);
+		}
+
+		socket.send(JSON.stringify({ type: 'channelJoin', channelData }));
 	},
 
 	channelLeave(user, userChannels, socket) {
@@ -175,7 +209,13 @@ const events = {
 					channel: { name: channel.name }
 				};
 
-				io.to(channel.name).emit('message', systemMessage);
+				Object.values(users).forEach(chatronUser => {
+					if (Object.keys(users).length === 0) return;
+
+					if (chatronUser.channels.hasOwnProperty(channel.name)) {
+						sockets[chatronUser.id].send(JSON.stringify({ type: 'userMessage', userMessage: systemMessage }));
+					}
+				});
 				channels[channel.name].messages.push(systemMessage);
 
 				Object.keys(channels[channel.name].users).length - 1
@@ -183,16 +223,27 @@ const events = {
 					: delete channels[channel.name];
 				// delete channel if removing this user would empty it completely
 
-				io.to(channel.name).emit('channelUserLeave', { username: user.username }, { name: channel.name });
-				socket.leave(channel.name);
+				Object.values(users).forEach(chatronUser => {
+					if (Object.keys(users).length === 0) return;
+
+					if (chatronUser.channels.hasOwnProperty(channel.name)) {
+						sockets[chatronUser.id].send(JSON.stringify({
+							type: 'channelUserLeave',
+							user: { username: user.username },
+							channel: { name: channel.name }
+						}));
+					}
+				});
 			}
 		});
 
-		console.log(`[${events.timestamp}] User '${user.username}' left the '${userChannels.map(c => c.name).join(', ')}' channel(s).`);
-		socket.emit('channelLeave', channelData);
+		if (!channelData.error) {
+			console.log(`[${events.timestamp}] User '${user.username}' left the '${userChannels.map(c => c.name).join(', ')}' channel(s).`);
+		}
+		socket.send(JSON.stringify({ type: 'channelLeave', channelData }));
 	},
 
-	message(message, socket) {
+	userMessage(message, socket) {
 		const messageData = {};
 
 		if (message.content.length === 0) {
@@ -216,12 +267,19 @@ const events = {
 			Object.assign(messageData, message);
 		}
 
-		return io.to(message.channel.name).emit('message', messageData);
+		return Object.values(users).forEach(chatronUser => {
+			if (Object.keys(users).length === 0) return;
+
+			if (chatronUser.channels.hasOwnProperty(message.channel.name)) {
+				sockets[chatronUser.id].send(JSON.stringify({ type: 'userMessage', userMessage: messageData }));
+			}
+		});
 	},
 
 	deleteUser(user, socket) {
 		delete users[user.username];
 		delete sockets[socket.id];
+
 		Object.values(user.channels).forEach(channel => {
 			const systemMessage = {
 				content: `<b>${user.username}</b> has left.`,
@@ -230,7 +288,13 @@ const events = {
 				channel: { name: channel.name }
 			};
 
-			io.to(channel.name).emit('message', systemMessage);
+			Object.values(users).forEach(chatronUser => {
+				if (Object.keys(users).length === 0) return;
+
+				if (chatronUser.channels.hasOwnProperty(channel.name)) {
+					sockets[chatronUser.id].send(JSON.stringify({ type: 'userMessage', userMessage: systemMessage }));
+				}
+			});
 			channels[channel.name].messages.push(systemMessage);
 
 			Object.keys(channels[channel.name].users).length - 1
@@ -238,10 +302,20 @@ const events = {
 				: delete channels[channel.name];
 			// delete channel if removing this user would empty it completely
 
-			return io.to(channel.name).emit('channelUserLeave', { username: user.username }, { name: channel.name });
+			Object.values(users).forEach(chatronUser => {
+				if (Object.keys(users).length === 0) return;
+
+				if (chatronUser.channels.hasOwnProperty(channel.name)) {
+					sockets[chatronUser.id].send(JSON.stringify({
+						type: 'channelUserLeave',
+						user: { username: user.username },
+						channel: { name: channel.name }
+					}));
+				}
+			});
 		});
 
 		console.log(`[${events.timestamp}] User '${user.username}' disconnected and left all channels.`);
-		socket.emit('logout', null);
+		return socket.send(JSON.stringify({ type: 'logout' }));
 	}
 };
